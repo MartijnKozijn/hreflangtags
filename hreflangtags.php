@@ -8,7 +8,7 @@ class HreflangTags extends Module
     public function __construct()
     {
         $this->name = 'hreflangtags';
-        $this->version = '1.0.0';
+        $this->version = '1.2.1';
         $this->author = 'Jaymian-Lee Reinartz';
         $this->need_instance = 0;
         $this->bootstrap = true;
