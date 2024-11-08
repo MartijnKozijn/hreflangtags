@@ -8,7 +8,7 @@ class HreflangTags extends Module
     public function __construct()
     {
         $this->name = 'hreflangtags';
-        $this->version = '1.2.1';
+        $this->version = '1.0.1';
         $this->author = 'Jaymian-Lee Reinartz';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -21,74 +21,91 @@ class HreflangTags extends Module
 
     public function install()
     {
-        return parent::install() && $this->registerHook('displayHeader') && $this->installDb();
+        return parent::install()
+            && $this->registerHook('displayHeader')
+            && $this->installDb();
     }
 
     public function installDb()
     {
         return Db::getInstance()->execute('
-            CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'hreflang_tags` (
+            CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'hreflang_tags` (
                 `id_hreflang` int(11) NOT NULL AUTO_INCREMENT,
                 `url` varchar(255) NOT NULL,
                 `locale` varchar(5) NOT NULL,
                 PRIMARY KEY (`id_hreflang`)
-            ) ENGINE='._MYSQL_ENGINE_.' DEFAULT CHARSET=utf8;
+            ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;
         ');
     }
 
     public function uninstall()
     {
-        return parent::uninstall() && Db::getInstance()->execute('DROP TABLE IF EXISTS `'._DB_PREFIX_.'hreflang_tags`');
+        return parent::uninstall()
+            && Db::getInstance()->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'hreflang_tags`');
     }
 
     public function getContent()
     {
         $output = '';
-        
-        // Opslaan van nieuwe of bewerkte hreflang tag
-        if (Tools::isSubmit('submitHreflangTags')) {
-            $url = Tools::getValue('HREFLANG_URL');
-            $locale = Tools::getValue('HREFLANG_LOCALE');
-            
-            if (Tools::getValue('id_hreflang')) {
-                // Bewerken
-                Db::getInstance()->update('hreflang_tags', [
-                    'url' => pSQL($url),
-                    'locale' => pSQL($locale)
-                ], 'id_hreflang = ' . (int)Tools::getValue('id_hreflang'));
-                $output .= $this->displayConfirmation($this->l('Hreflang tag bijgewerkt.'));
-            } else {
-                // Toevoegen
-                Db::getInstance()->insert('hreflang_tags', [
-                    'url' => pSQL($url),
-                    'locale' => pSQL($locale)
-                ]);
-                $output .= $this->displayConfirmation($this->l('Hreflang tag toegevoegd.'));
-            }
+
+        // Verwerken van bewerken of verwijderen acties
+        if (Tools::isSubmit('updatehreflang_tags') || Tools::isSubmit('addhreflang_tags')) {
+            $output .= $this->renderForm();
+        } elseif (Tools::isSubmit('deletehreflang_tags')) {
+            $this->processDelete();
+            $output .= $this->renderList();
+        } elseif (Tools::isSubmit('submitHreflangTags')) {
+            $this->processSave();
+            $output .= $this->renderList();
+        } else {
+            $output .= $this->renderList();
+            $output .= $this->renderForm();
         }
-        
-        // Verwijderen van een hreflang tag
-        if (Tools::isSubmit('deleteHreflang')) {
-            Db::getInstance()->delete('hreflang_tags', 'id_hreflang = ' . (int)Tools::getValue('id_hreflang'));
-            $output .= $this->displayConfirmation($this->l('Hreflang tag verwijderd.'));
-        }
-        
-        // Render de form en overzichtslijst
-        $output .= $this->renderForm();
-        $output .= $this->renderList();
-        
+
         return $output;
+    }
+
+    protected function processSave()
+    {
+        $id_hreflang = (int) Tools::getValue('id_hreflang');
+        $url = Tools::getValue('HREFLANG_URL');
+        $locale = Tools::getValue('HREFLANG_LOCALE');
+
+        if ($id_hreflang) {
+            // Bewerken
+            Db::getInstance()->update('hreflang_tags', [
+                'url' => pSQL($url),
+                'locale' => pSQL($locale)
+            ], 'id_hreflang = ' . $id_hreflang);
+            $this->context->controller->confirmations[] = $this->l('Hreflang tag bijgewerkt.');
+        } else {
+            // Toevoegen
+            Db::getInstance()->insert('hreflang_tags', [
+                'url' => pSQL($url),
+                'locale' => pSQL($locale)
+            ]);
+            $this->context->controller->confirmations[] = $this->l('Hreflang tag toegevoegd.');
+        }
+    }
+
+    protected function processDelete()
+    {
+        $id_hreflang = (int) Tools::getValue('id_hreflang');
+        if ($id_hreflang) {
+            Db::getInstance()->delete('hreflang_tags', 'id_hreflang = ' . $id_hreflang);
+            $this->context->controller->confirmations[] = $this->l('Hreflang tag verwijderd.');
+        }
     }
 
     protected function renderForm()
     {
-        $id_hreflang = (int)Tools::getValue('id_hreflang');
-        $hreflang = $id_hreflang ? Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'hreflang_tags WHERE id_hreflang = '.$id_hreflang) : null;
-        
+        $id_hreflang = (int) Tools::getValue('id_hreflang');
+        $hreflang = $id_hreflang ? Db::getInstance()->getRow('SELECT * FROM ' . _DB_PREFIX_ . 'hreflang_tags WHERE id_hreflang = ' . $id_hreflang) : null;
+
         $fields_form = [
             'form' => [
                 'legend' => [
-                    'title' => $this->l('Hreflang Tag Instellingen'),
+                    'title' => $id_hreflang ? $this->l('Hreflang Tag Bewerken') : $this->l('Nieuwe Hreflang Tag'),
                     'icon' => 'icon-cogs'
                 ],
                 'input' => [
@@ -102,6 +119,7 @@ class HreflangTags extends Module
                         'label' => $this->l('URL'),
                         'name' => 'HREFLANG_URL',
                         'required' => true,
+                        'col' => 6,
                         'value' => $hreflang ? $hreflang['url'] : '',
                     ],
                     [
@@ -109,6 +127,7 @@ class HreflangTags extends Module
                         'label' => $this->l('Taalcode (locale)'),
                         'name' => 'HREFLANG_LOCALE',
                         'required' => true,
+                        'col' => 2,
                         'desc' => $this->l('Bijv. nl-NL, fr-FR'),
                         'value' => $hreflang ? $hreflang['locale'] : '',
                     ],
@@ -121,11 +140,18 @@ class HreflangTags extends Module
         ];
 
         $helper = new HelperForm();
+        $helper->show_toolbar = false;
+        $helper->table = 'hreflang_tags';
         $helper->module = $this;
-        $helper->identifier = $this->identifier;
+        $helper->default_form_language = $this->context->language->id;
+        $helper->allow_employee_form_lang = $this->context->language->id;
+        $helper->identifier = 'id_hreflang';
         $helper->submit_action = 'submitHreflangTags';
         $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false)
-            .'&configure='.$this->name.'&tab_module='.$this->tab.'&module_name='.$this->name;
+            . '&configure=' . $this->name . '&tab_module=' . $this->tab . '&module_name=' . $this->name;
+        if ($id_hreflang) {
+            $helper->currentIndex .= '&id_hreflang=' . $id_hreflang;
+        }
         $helper->token = Tools::getAdminTokenLite('AdminModules');
 
         return $helper->generateForm([$fields_form]);
@@ -133,23 +159,24 @@ class HreflangTags extends Module
 
     protected function renderList()
     {
-        $hreflangs = Db::getInstance()->executeS('SELECT * FROM '._DB_PREFIX_.'hreflang_tags');
-        
+        $hreflangs = Db::getInstance()->executeS('SELECT * FROM ' . _DB_PREFIX_ . 'hreflang_tags');
+
         $fields_list = [
             'id_hreflang' => [
                 'title' => $this->l('ID'),
-                'type' => 'text',
+                'align' => 'center',
+                'width' => 25
             ],
             'url' => [
                 'title' => $this->l('URL'),
-                'type' => 'text',
+                'width' => 'auto'
             ],
             'locale' => [
                 'title' => $this->l('Locale'),
-                'type' => 'text',
+                'width' => 50
             ],
         ];
-        
+
         $helper = new HelperList();
         $helper->shopLinkType = '';
         $helper->simple_header = true;
@@ -157,15 +184,15 @@ class HreflangTags extends Module
         $helper->identifier = 'id_hreflang';
         $helper->title = $this->l('Hreflang Tags');
         $helper->table = 'hreflang_tags';
-        $helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name . '&module_name=' . $this->name;
         $helper->token = Tools::getAdminTokenLite('AdminModules');
-        
+
         return $helper->generateList($hreflangs, $fields_list);
     }
 
     public function hookDisplayHeader()
     {
-        $hreflangs = Db::getInstance()->executeS('SELECT * FROM '._DB_PREFIX_.'hreflang_tags');
+        $hreflangs = Db::getInstance()->executeS('SELECT * FROM ' . _DB_PREFIX_ . 'hreflang_tags');
         $this->context->smarty->assign('hreflangs', $hreflangs);
         return $this->display(__FILE__, 'views/templates/hook/hreflangtags.tpl');
     }
