@@ -8,7 +8,7 @@ class HreflangTags extends Module
     public function __construct()
     {
         $this->name = 'hreflangtags';
-        $this->version = '1.0.1';
+        $this->version = '1.0.2';
         $this->author = 'Jaymian-Lee Reinartz';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -48,16 +48,21 @@ class HreflangTags extends Module
     {
         $output = '';
 
-        // Verwerken van bewerken of verwijderen acties
+        // Verwerken van bewerken of toevoegen acties
         if (Tools::isSubmit('updatehreflang_tags') || Tools::isSubmit('addhreflang_tags')) {
             $output .= $this->renderForm();
-        } elseif (Tools::isSubmit('deletehreflang_tags')) {
-            $this->processDelete();
-            $output .= $this->renderList();
-        } elseif (Tools::isSubmit('submitHreflangTags')) {
-            $this->processSave();
-            $output .= $this->renderList();
         } else {
+            // Verwerken van verwijderactie
+            if (Tools::isSubmit('deletehreflang_tags')) {
+                $this->processDelete();
+            }
+
+            // Verwerken van opslaan actie
+            if (Tools::isSubmit('submitHreflangTags')) {
+                $this->processSave();
+            }
+
+            // Altijd zowel de lijst als het formulier weergeven
             $output .= $this->renderList();
             $output .= $this->renderForm();
         }
@@ -112,7 +117,6 @@ class HreflangTags extends Module
                     [
                         'type' => 'hidden',
                         'name' => 'id_hreflang',
-                        'value' => $id_hreflang
                     ],
                     [
                         'type' => 'text',
@@ -153,6 +157,13 @@ class HreflangTags extends Module
             $helper->currentIndex .= '&id_hreflang=' . $id_hreflang;
         }
         $helper->token = Tools::getAdminTokenLite('AdminModules');
+
+        // Vul de huidige waarden in
+        $helper->fields_value = [
+            'id_hreflang' => $id_hreflang,
+            'HREFLANG_URL' => $hreflang ? $hreflang['url'] : '',
+            'HREFLANG_LOCALE' => $hreflang ? $hreflang['locale'] : '',
+        ];
 
         return $helper->generateForm([$fields_form]);
     }
